@@ -3,6 +3,8 @@ package com.community.athenixback.auth.controller;
 import com.community.athenixback.auth.dto.*;
 import com.community.athenixback.auth.service.AuthService;
 import com.community.athenixback.common.response.ApiResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -35,7 +37,18 @@ public class AuthController {
     public ResponseEntity<ApiResponse<LoginResponse>> login(@RequestBody LoginRequest request) {
         log.info("로그인 요청: {}", request.getEmail());
         LoginResponse response = authService.login(request);
-        return ResponseEntity.ok(ApiResponse.success(response));
+
+        // video crossorigin="use-credentials" 방식을 위해 HttpOnly 쿠키로도 발급
+        ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", response.getAccessToken())
+            .httpOnly(true)
+            .path("/")
+            .maxAge(3600) // jwt.expiration=3600000ms = 1시간
+            .sameSite("Lax")
+            .build();
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+            .body(ApiResponse.success(response));
     }
 
     @PostMapping("/logout")
@@ -62,6 +75,16 @@ public class AuthController {
 
         String token = authHeader.substring(7);
         TokenRefreshResponse response = authService.refreshToken(token);
-        return ResponseEntity.ok(ApiResponse.success(response));
+
+        ResponseCookie accessTokenCookie = ResponseCookie.from("accessToken", response.getAccessToken())
+            .httpOnly(true)
+            .path("/")
+            .maxAge(3600)
+            .sameSite("Lax")
+            .build();
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, accessTokenCookie.toString())
+            .body(ApiResponse.success(response));
     }
 }

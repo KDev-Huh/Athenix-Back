@@ -14,6 +14,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -31,6 +33,7 @@ public class MatchService {
     private final VideoThumbnailUtil videoThumbnailUtil;
     private final AIFeedbackService aiFeedbackService;
     private final MemoService memoService;
+    private final VideoProcessingService videoProcessingService;
 
     @Transactional
     public MatchResponse uploadMatch(User user, MultipartFile file, MatchUploadRequest request) throws IOException {
@@ -42,16 +45,7 @@ public class MatchService {
         String filePath = fileStorageUtil.saveVideoFile(file);
         long fileSize = fileStorageUtil.getFileSize(filePath);
 
-        // 썸네일 생성 (첫 번째 프레임에서 0초 시점)
-        String thumbnailUrl = null;
-        try {
-            thumbnailUrl = videoThumbnailUtil.generateThumbnail(filePath, 0);
-            log.info("썸네일 생성 완료: {}", thumbnailUrl);
-        } catch (Exception e) {
-            log.warn("썸네일 생성 실패: {}", e.getMessage());
-        }
-
-        // Match 엔티티 생성
+        // Match 즉시 저장 (처리중 상태)
         Match match = Match.builder()
             .user(user)
             .title(request.getTitle() != null ? request.getTitle() : file.getOriginalFilename())
@@ -64,11 +58,20 @@ public class MatchService {
             .videoFilePath(filePath)
             .videoFileName(file.getOriginalFilename())
             .videoFileSize(fileSize)
-            .thumbnailUrl(thumbnailUrl)
-            .status("임시 저장")
+            .status("처리중")
             .build();
 
         matchRepository.save(match);
+
+        // 트랜잭션 커밋 완료 후 백그라운드 처리 (커밋 전 조회 시 not found 방지)
+        Long matchId = match.getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                videoProcessingService.processVideo(matchId, filePath);
+            }
+        });
+
         return mapToResponse(match);
     }
 

@@ -1,6 +1,7 @@
 package com.community.athenixback.match.client;
 
 import com.community.athenixback.match.dto.AIServerResponse;
+import com.community.athenixback.match.dto.AIServerRawResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,9 +35,10 @@ public class AIServerClient {
      * @param fileName 이미지 파일명
      * @return AIServerResponse (situation, playGuide)
      */
-    public AIServerResponse requestPlayRecommendation(byte[] imageBytes, String fileName) {
+    public AIServerResponse requestPlayRecommendation(byte[] imageBytes, String fileName, Boolean isRtl) {
         try {
-            String url = aiServerUrl + recommendEndpoint;
+            String baseUrl = aiServerUrl + recommendEndpoint;
+            String url = (isRtl != null) ? baseUrl + "?is_rtl=" + isRtl : baseUrl;
 
             // multipart/form-data 요청 생성
             HttpHeaders headers = new HttpHeaders();
@@ -58,13 +60,29 @@ public class AIServerClient {
 
             log.info("AI 서버에 이미지 분석 요청: {}", url);
 
-            AIServerResponse response = restTemplate.postForObject(url, entity, AIServerResponse.class);
+            // AI 서버는 { "success": true, "data": {...}, "error": null } 구조로 응답
+            AIServerRawResponse rawResponse = restTemplate.postForObject(url, entity, AIServerRawResponse.class);
 
-            if (response != null) {
-                log.info("AI 서버 응답 수신: situation={}, playGuide.type={}",
-                    response.getSituation(),
-                    response.getPlayGuide() != null ? response.getPlayGuide().getType() : "null");
+            if (rawResponse == null || !Boolean.TRUE.equals(rawResponse.getSuccess())) {
+                log.error("AI 서버 응답 실패 또는 null");
+                throw new RuntimeException("AI 서버 응답이 실패했습니다.");
             }
+
+            AIServerResponse response = rawResponse.getData();
+            if (response == null) {
+                log.error("AI 서버 응답의 data 필드가 null");
+                throw new RuntimeException("AI 서버 응답의 data 필드가 null입니다.");
+            }
+
+            // situation이 null인 경우 기본값 설정
+            if (response.getSituation() == null || response.getSituation().trim().isEmpty()) {
+                log.warn("AI 서버 응답의 situation이 비어있습니다. 기본값 설정");
+                response.setSituation("분석 결과를 획득할 수 없습니다.");
+            }
+
+            log.info("AI 서버 응답 수신: situation={}, playGuide.type={}",
+                response.getSituation(),
+                response.getPlayGuide() != null ? response.getPlayGuide().getType() : "null");
 
             return response;
         } catch (Exception e) {
@@ -73,3 +91,5 @@ public class AIServerClient {
         }
     }
 }
+
+

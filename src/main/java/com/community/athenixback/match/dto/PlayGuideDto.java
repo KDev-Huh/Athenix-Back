@@ -13,17 +13,26 @@ import lombok.NoArgsConstructor;
 public class PlayGuideDto {
     private String type;
 
-    @JsonProperty("start_x")
-    private Double startX;
+    private CoordinateDto start;
+    private CoordinateDto end;
 
-    @JsonProperty("start_y")
-    private Double startY;
+    @JsonProperty("start_pixel")
+    private CoordinateDto startPixel;
 
-    @JsonProperty("end_x")
-    private Double endX;  // nullable
-
-    @JsonProperty("end_y")
-    private Double endY;  // nullable
+    @JsonProperty("end_pixel")
+    private CoordinateDto endPixel;
 
     private String message;
+
+    /**
+     * 좌표 정보 (x, y)
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class CoordinateDto {
+        private Double x;
+        private Double y;
+    }
 }

@@ -11,4 +11,5 @@ import lombok.NoArgsConstructor;
 @Builder
 public class AIFeedbackRequest {
     private Long timeMs;
+    private Boolean isRtl;
 }

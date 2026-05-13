@@ -6,11 +6,13 @@ import com.community.athenixback.common.util.VideoThumbnailUtil;
 import com.community.athenixback.match.dto.MemoCreateRequest;
 import com.community.athenixback.match.dto.MemoResponse;
 import com.community.athenixback.match.dto.MemoUpdateRequest;
+import com.community.athenixback.match.dto.PlayGuideDto;
 import com.community.athenixback.match.entity.AIFeedback;
 import com.community.athenixback.match.entity.Match;
 import com.community.athenixback.match.entity.Memo;
 import com.community.athenixback.match.repository.MatchRepository;
 import com.community.athenixback.match.repository.MemoRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -29,6 +31,7 @@ public class MemoService {
     private final MemoRepository memoRepository;
     private final MatchRepository matchRepository;
     private final VideoThumbnailUtil videoThumbnailUtil;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public MemoResponse createMemo(Long matchId, User user, MemoCreateRequest request) {
@@ -143,8 +146,14 @@ public class MemoService {
      */
     @Transactional
     public MemoResponse addFeedbackAsMemo(Match match, AIFeedback feedback, String label) {
-        // 생성된 메모의 텍스트 구성: "[label] situation + playGuide message"
-        String memoText = String.format("[%s] %s", label, feedback.getSituation());
+        String memoText;
+        try {
+            PlayGuideDto playGuide = objectMapper.readValue(feedback.getPlayGuideJson(), PlayGuideDto.class);
+            memoText = playGuide.getMessage() != null ? playGuide.getMessage() : feedback.getSituation();
+        } catch (Exception e) {
+            log.warn("playGuideJson 파싱 실패, situation으로 대체: feedbackId={}", feedback.getId());
+            memoText = feedback.getSituation();
+        }
 
         Memo memo = Memo.builder()
             .match(match)

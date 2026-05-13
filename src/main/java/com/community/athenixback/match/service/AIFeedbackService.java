@@ -40,10 +40,10 @@ public class AIFeedbackService {
      * 3. 응답받아 DB에 저장
      * 4. feedbackId, timeMs, timeLabel, createdAt 포함해서 반환
      */
-    public AIFeedbackResponse createFeedback(Match match, Long timeMs) {
+    public AIFeedbackResponse createFeedback(Match match, Long timeMs, Boolean isRtl) {
         try {
             // 1. 영상에서 해당 시간의 프레임 추출
-            log.info("프레임 추출 시작: matchId={}, timeMs={}", match.getId(), timeMs);
+            log.info("프레임 추출 시작: matchId={}, timeMs={}, isRtl={}", match.getId(), timeMs, isRtl);
             byte[] imageBytes = videoFrameExtractor.extractFrameAtTime(
                 match.getVideoFilePath(),
                 timeMs
@@ -51,10 +51,18 @@ public class AIFeedbackService {
 
             // 2. AI 서버에 이미지 전송하여 플레이 추천 받기
             String fileName = "frame_" + match.getId() + "_" + timeMs + ".jpg";
-            AIServerResponse aiResponse = aiServerClient.requestPlayRecommendation(imageBytes, fileName);
+            AIServerResponse aiResponse = aiServerClient.requestPlayRecommendation(imageBytes, fileName, isRtl);
 
             if (aiResponse == null) {
                 throw new RuntimeException("AI 서버 응답이 null입니다");
+            }
+
+            // situation 필드 최종 검증
+            String situation = aiResponse.getSituation();
+            if (situation == null || situation.trim().isEmpty()) {
+                log.warn("AI 서버 응답의 situation이 비어있습니다. 기본값 사용: matchId={}, timeMs={}",
+                    match.getId(), timeMs);
+                situation = "분석 결과를 획득할 수 없습니다.";
             }
 
             // 3. playGuideJson으로 저장하기 위해 JSON 문자열로 변환
@@ -64,7 +72,7 @@ public class AIFeedbackService {
             AIFeedback feedback = AIFeedback.builder()
                 .match(match)
                 .timeMs(timeMs)
-                .situation(aiResponse.getSituation())
+                .situation(situation)
                 .playGuideJson(playGuideJson)
                 .build();
 

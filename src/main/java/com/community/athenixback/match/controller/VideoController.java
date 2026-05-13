@@ -6,11 +6,9 @@ import com.community.athenixback.common.response.ApiResponse;
 import com.community.athenixback.match.dto.VideoMetaResponse;
 import com.community.athenixback.match.entity.Match;
 import com.community.athenixback.match.repository.MatchRepository;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,7 +16,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
+import java.io.OutputStream;
+import java.io.RandomAccessFile;
 
 @Slf4j
 @RestController
@@ -37,86 +36,135 @@ public class VideoController {
     }
 
     @GetMapping
-    public ResponseEntity<Resource> streamVideo(@PathVariable Long matchId,
-                                                @RequestHeader(value = "Range", required = false) String range) {
-        log.info("영상 스트리밍 요청: matchId={}", matchId);
-        User user = getCurrentUser();
+    public void streamVideo(
+            @PathVariable Long matchId,
+            @RequestHeader(value = "Range", required = false) String range,
+            HttpServletResponse response) throws IOException {
 
-        Match match = matchRepository.findByIdAndUser(matchId, user)
-            .orElseThrow(() -> new ResourceNotFoundException("MATCH_NOT_FOUND", "경기를 찾을 수 없습니다."));
-
-        if (match.getVideoFilePath() == null || match.getVideoFilePath().isEmpty()) {
-            throw new ResourceNotFoundException("VIDEO_NOT_FOUND", "영상을 찾을 수 없습니다.");
-        }
-
-        File videoFile = new File(match.getVideoFilePath());
-        if (!videoFile.exists()) {
-            throw new ResourceNotFoundException("VIDEO_NOT_FOUND", "영상 파일이 없습니다.");
-        }
+        log.info("영상 스트리밍 요청: matchId={}, range={}", matchId, range);
 
         try {
+            User user = getCurrentUser();
+
+            Match match = matchRepository.findByIdAndUser(matchId, user)
+                .orElseThrow(() -> new ResourceNotFoundException("MATCH_NOT_FOUND", "경기를 찾을 수 없습니다."));
+
+            if (match.getVideoFilePath() == null || match.getVideoFilePath().isEmpty()) {
+                throw new ResourceNotFoundException("VIDEO_NOT_FOUND", "영상을 찾을 수 없습니다.");
+            }
+
+            File videoFile = new File(match.getVideoFilePath());
+            if (!videoFile.exists()) {
+                throw new ResourceNotFoundException("VIDEO_NOT_FOUND", "영상 파일이 없습니다.");
+            }
+
             long fileSize = videoFile.length();
-            Resource resource = new FileSystemResource(videoFile);
+            log.info("영상 스트리밍 승인됨: matchId={}, userId={}, fileSize={}", matchId, user.getId(), fileSize);
+
+            response.setContentType("video/mp4");
+            response.setHeader("Accept-Ranges", "bytes");
 
             if (range != null && range.startsWith("bytes=")) {
-                // Range 요청 처리
-                String[] rangeParts = range.substring(6).split("-");
-                long start = Long.parseLong(rangeParts[0]);
-                long end = rangeParts.length > 1 && !rangeParts[1].isEmpty()
-                    ? Long.parseLong(rangeParts[1])
-                    : fileSize - 1;
-
-                long contentLength = end - start + 1;
-
-                return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
-                    .header(HttpHeaders.CONTENT_TYPE, "video/mp4")
-                    .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(contentLength))
-                    .header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + fileSize)
-                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                    .body(resource);
+                serveRange(range, fileSize, videoFile, response);
             } else {
-                // 전체 파일 요청
-                return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_TYPE, "video/mp4")
-                    .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(fileSize))
-                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                    .body(resource);
+                serveFullFile(fileSize, videoFile, response);
             }
+
+        } catch (IllegalArgumentException e) {
+            log.warn("인증되지 않은 요청");
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "인증이 필요합니다.");
+        } catch (ResourceNotFoundException e) {
+            log.warn("영상 조회 실패: {}", e.getMessage());
+            response.sendError(HttpServletResponse.SC_NOT_FOUND, e.getMessage());
         } catch (Exception e) {
             log.error("영상 스트리밍 오류", e);
-            throw new IllegalArgumentException("영상 스트리밍 중 오류가 발생했습니다.");
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "영상 스트리밍 중 오류가 발생했습니다.");
+        }
+    }
+
+    private void serveRange(String range, long fileSize, File videoFile, HttpServletResponse response) throws IOException {
+        try {
+            String[] rangeParts = range.substring(6).split("-");
+            long start = Long.parseLong(rangeParts[0]);
+            long end = rangeParts.length > 1 && !rangeParts[1].isEmpty()
+                ? Long.parseLong(rangeParts[1])
+                : fileSize - 1;
+
+            if (start > end || start < 0 || end >= fileSize) {
+                log.warn("잘못된 Range: {}", range);
+                response.setStatus(HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE);
+                response.setHeader("Content-Range", "bytes */" + fileSize);
+                return;
+            }
+
+            long contentLength = end - start + 1;
+            log.debug("Range 요청 처리: {}-{}/{}", start, end, fileSize);
+
+            response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
+            response.setHeader("Content-Range", String.format("bytes %d-%d/%d", start, end, fileSize));
+            response.setHeader("Content-Length", String.valueOf(contentLength));
+
+            try (RandomAccessFile raf = new RandomAccessFile(videoFile, "r");
+                 OutputStream out = response.getOutputStream()) {
+                raf.seek(start);
+                byte[] buf = new byte[8192];
+                long remaining = contentLength;
+                int read;
+                while (remaining > 0 && (read = raf.read(buf, 0, (int) Math.min(buf.length, remaining))) != -1) {
+                    out.write(buf, 0, read);
+                    remaining -= read;
+                }
+            }
+        } catch (NumberFormatException e) {
+            log.warn("Range 파싱 실패: {}", range);
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "잘못된 Range 헤더입니다.");
+        }
+    }
+
+    private void serveFullFile(long fileSize, File videoFile, HttpServletResponse response) throws IOException {
+        log.debug("전체 파일 요청 처리: {} bytes", fileSize);
+        response.setHeader("Content-Length", String.valueOf(fileSize));
+
+        try (RandomAccessFile raf = new RandomAccessFile(videoFile, "r");
+             OutputStream out = response.getOutputStream()) {
+            byte[] buf = new byte[8192];
+            int read;
+            while ((read = raf.read(buf)) != -1) {
+                out.write(buf, 0, read);
+            }
         }
     }
 
     @GetMapping("/meta")
     public ResponseEntity<ApiResponse<VideoMetaResponse>> getVideoMeta(@PathVariable Long matchId) {
         log.info("영상 메타 조회: matchId={}", matchId);
-        User user = getCurrentUser();
-
-        Match match = matchRepository.findByIdAndUser(matchId, user)
-            .orElseThrow(() -> new ResourceNotFoundException("MATCH_NOT_FOUND", "경기를 찾을 수 없습니다."));
-
-        if (match.getVideoFilePath() == null || match.getVideoFilePath().isEmpty()) {
-            throw new ResourceNotFoundException("VIDEO_NOT_FOUND", "영상을 찾을 수 없습니다.");
-        }
-
-        File videoFile = new File(match.getVideoFilePath());
-        if (!videoFile.exists()) {
-            throw new ResourceNotFoundException("VIDEO_NOT_FOUND", "영상 파일이 없습니다.");
-        }
 
         try {
-            VideoMetaResponse response = VideoMetaResponse.builder()
+            User user = getCurrentUser();
+
+            Match match = matchRepository.findByIdAndUser(matchId, user)
+                .orElseThrow(() -> new ResourceNotFoundException("MATCH_NOT_FOUND", "경기를 찾을 수 없습니다."));
+
+            if (match.getVideoFilePath() == null || match.getVideoFilePath().isEmpty()) {
+                throw new ResourceNotFoundException("VIDEO_NOT_FOUND", "영상을 찾을 수 없습니다.");
+            }
+
+            File videoFile = new File(match.getVideoFilePath());
+            if (!videoFile.exists()) {
+                throw new ResourceNotFoundException("VIDEO_NOT_FOUND", "영상 파일이 없습니다.");
+            }
+
+            VideoMetaResponse metaResponse = VideoMetaResponse.builder()
                 .durationSec(match.getVideoDurationSec() != null ? match.getVideoDurationSec() : 0L)
-                .codec("h264")
-                .sizeBytes(match.getVideoFileSize() != null ? match.getVideoFileSize() : 0L)
-                .thumbnailUrl(null)
+                .sizeBytes(videoFile.length())
                 .build();
 
-            return ResponseEntity.ok(ApiResponse.success(response));
-        } catch (Exception e) {
-            log.error("영상 메타 조회 오류", e);
-            throw new IllegalArgumentException("영상 메타 조회 중 오류가 발생했습니다.");
+            return ResponseEntity.ok(ApiResponse.success(metaResponse));
+
+        } catch (ResourceNotFoundException ex) {
+            log.warn("영상 메타 조회 실패: {}", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.failure(ex.getCode(), ex.getMessage()));
         }
     }
 }

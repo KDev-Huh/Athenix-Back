@@ -49,8 +49,16 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(java.util.Collections.singletonList("*"));
-        configuration.setAllowedMethods(java.util.Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(java.util.Collections.singletonList("*"));
+        configuration.setAllowedMethods(java.util.Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
+        configuration.setAllowedHeaders(java.util.Arrays.asList("*", "Range", "Authorization"));
+        configuration.setExposedHeaders(java.util.Arrays.asList(
+            "Content-Range",
+            "Content-Length",
+            "Accept-Ranges",
+            "Access-Control-Allow-Origin"
+        ));
+        // ✅ 쿠키(HttpOnly) 전송을 위해 반드시 필요
+        configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

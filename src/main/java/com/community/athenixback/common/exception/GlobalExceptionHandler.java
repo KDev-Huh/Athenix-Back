@@ -2,15 +2,26 @@ package com.community.athenixback.common.exception;
 
 import com.community.athenixback.common.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /**
+     * 클라이언트가 연결을 끊었을 때 발생하는 예외 - 무시
+     * (다운로드 취소, 페이지 닫음 등의 정상적인 상황)
+     */
+    @ExceptionHandler({ClientAbortException.class, AsyncRequestNotUsableException.class})
+    public void handleClientAbort(Exception ex) {
+        log.debug("클라이언트 연결 끊김 (정상): {}", ex.getClass().getSimpleName());
+    }
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiResponse<?>> handleBadCredentials(BadCredentialsException ex) {

@@ -3,11 +3,13 @@ package com.community.athenixback.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.http.client.BufferingClientHttpRequestFactory;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
+@EnableAsync
 @Configuration
 public class RestTemplateConfig {
 
@@ -18,8 +20,8 @@ public class RestTemplateConfig {
 
     private ClientHttpRequestFactory clientHttpRequestFactory() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(10000); // 10 seconds
-        factory.setReadTimeout(30000);    // 30 seconds
+        factory.setConnectTimeout(30000); // 30 seconds
+        factory.setReadTimeout(120000);   // 120 seconds (2 minutes)
         return new BufferingClientHttpRequestFactory(factory);
     }
 

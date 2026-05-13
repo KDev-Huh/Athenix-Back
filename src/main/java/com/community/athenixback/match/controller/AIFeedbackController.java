@@ -40,14 +40,14 @@ public class AIFeedbackController {
         @PathVariable Long matchId,
         @RequestBody AIFeedbackRequest request) {
 
-        log.info("AI 피드백 생성 요청: matchId={}, timeMs={}", matchId, request.getTimeMs());
+        log.info("AI 피드백 생성 요청: matchId={}, timeMs={}, isRtl={}", matchId, request.getTimeMs(), request.getIsRtl());
 
         // 경기 존재 여부 확인 - Optional 반환 메서드 사용
         Match match = matchService.getMatchById(matchId)
             .orElseThrow(() -> new IllegalArgumentException("경기를 찾을 수 없습니다."));
 
         // AI 서버에서 피드백 생성
-        AIFeedbackResponse response = aiFeedbackService.createFeedback(match, request.getTimeMs());
+        AIFeedbackResponse response = aiFeedbackService.createFeedback(match, request.getTimeMs(), request.getIsRtl());
 
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.success(response));

@@ -83,6 +83,49 @@ public class VideoThumbnailUtil {
     }
 
     /**
+     * H.264 + faststart 트랜스코딩 (Chrome 호환, moov atom 앞으로 이동)
+     * 비동기로 호출되므로 응답 속도에 영향 없음
+     *
+     * @param inputPath 원본 파일 경로
+     * @return 트랜스코딩된 파일 경로 (실패 시 inputPath 반환)
+     */
+    public String transcodeToH264(String inputPath) {
+        String outputPath = inputPath.replaceAll("\\.[^.]+$", "") + "_h264.mp4";
+
+        String[] command = {
+            "ffmpeg",
+            "-i", inputPath,
+            "-c:v", "libx264",
+            "-c:a", "aac",
+            "-movflags", "+faststart",
+            "-y",
+            outputPath
+        };
+
+        try {
+            ProcessBuilder pb = new ProcessBuilder(command);
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            while (reader.readLine() != null) { /* drain */ }
+
+            int exitCode = process.waitFor();
+            if (exitCode == 0 && new File(outputPath).exists()) {
+                new File(inputPath).delete();
+                log.info("트랜스코딩 완료: {} → {}", inputPath, outputPath);
+                return outputPath;
+            } else {
+                log.error("트랜스코딩 실패: exitCode={}", exitCode);
+                return inputPath;
+            }
+        } catch (Exception e) {
+            log.error("트랜스코딩 중 오류: {}", e.getMessage(), e);
+            return inputPath;
+        }
+    }
+
+    /**
      * 썸네일 파일 삭제
      */
     public void deleteThumbnail(String thumbnailUrl) {
