@@ -1,7 +1,10 @@
 package com.community.athenixback.match.client;
 
+import com.community.athenixback.common.exception.AIServerException;
 import com.community.athenixback.match.dto.AIServerResponse;
 import com.community.athenixback.match.dto.AIServerRawResponse;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 @Slf4j
@@ -20,6 +24,7 @@ import org.springframework.web.client.RestTemplate;
 public class AIServerClient {
 
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
     @Value("${ai.server.url}")
     private String aiServerUrl;
@@ -85,11 +90,25 @@ public class AIServerClient {
                 response.getPlayGuide() != null ? response.getPlayGuide().getType() : "null");
 
             return response;
+        } catch (HttpClientErrorException e) {
+            log.error("AI 서버 이미지 분석 요청 실패", e);
+            String detail = extractDetail(e.getResponseBodyAsString());
+            throw new AIServerException("AI_SERVER_ERROR", detail, e.getStatusCode().value());
+        } catch (AIServerException e) {
+            throw e;
         } catch (Exception e) {
             log.error("AI 서버 이미지 분석 요청 실패", e);
-            throw new RuntimeException("AI 서버 이미지 분석 실패: " + e.getMessage(), e);
+            throw new AIServerException("AI_SERVER_ERROR", "AI 서버 오류가 발생했습니다.", 500);
         }
     }
+
+    private String extractDetail(String responseBody) {
+        try {
+            JsonNode node = objectMapper.readTree(responseBody);
+            if (node.has("detail")) {
+                return node.get("detail").asText();
+            }
+        } catch (Exception ignored) {}
+        return "AI 서버 오류가 발생했습니다.";
+    }
 }
-
-

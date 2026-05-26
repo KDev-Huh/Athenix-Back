@@ -6,7 +6,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.UUID;
 
@@ -19,88 +18,38 @@ public class VideoThumbnailUtil {
 
     private static final String THUMBNAIL_DIR = "thumbnails";
 
-    /**
-     * 영상 파일에서 특정 시간의 썸네일 추출
-     * @param videoFilePath 영상 파일 경로
-     * @param timeMs 시간 (밀리초)
-     * @return 썸네일 파일 상대 경로
-     */
-    public String generateThumbnail(String videoFilePath, long timeMs) {
-        try {
-            // 썸네일 디렉토리 생성
-            File thumbDir = new File(storagePath, THUMBNAIL_DIR);
-            if (!thumbDir.exists()) {
-                thumbDir.mkdirs();
-            }
+    public static class ProcessedVideo {
+        public final String videoPath;
+        public final String thumbnailUrl;
+        public final long durationSec;
 
-            // 썸네일 파일명 생성
-            String thumbnailFilename = UUID.randomUUID() + ".jpg";
-            String thumbnailPath = new File(thumbDir, thumbnailFilename).getAbsolutePath();
-
-            // 시간을 HH:mm:ss 형식으로 변환
-            long totalSeconds = timeMs / 1000;
-            long hours = totalSeconds / 3600;
-            long minutes = (totalSeconds % 3600) / 60;
-            long seconds = totalSeconds % 60;
-            String timeFormat = String.format("%02d:%02d:%02d", hours, minutes, seconds);
-
-            // ffmpeg 명령어 실행
-            String[] command = {
-                "ffmpeg",
-                "-i", videoFilePath,
-                "-ss", timeFormat,
-                "-vframes", "1",
-                "-vf", "scale=320:240",
-                "-y",
-                thumbnailPath
-            };
-
-            ProcessBuilder pb = new ProcessBuilder(command);
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
-
-            // 프로세스 출력 읽기 (timeout 방지)
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                log.debug("ffmpeg: {}", line);
-            }
-
-            int exitCode = process.waitFor();
-            if (exitCode == 0 && new File(thumbnailPath).exists()) {
-                log.info("썸네일 생성 완료: {}", thumbnailPath);
-                // 상대 경로 반환
-                return "/thumbnails/" + thumbnailFilename;
-            } else {
-                log.error("ffmpeg 실행 실패: exitCode={}", exitCode);
-                return null;
-            }
-
-        } catch (Exception e) {
-            log.error("썸네일 생성 중 오류: {}", e.getMessage(), e);
-            return null;
+        public ProcessedVideo(String videoPath, String thumbnailUrl, long durationSec) {
+            this.videoPath = videoPath;
+            this.thumbnailUrl = thumbnailUrl;
+            this.durationSec = durationSec;
         }
     }
 
     /**
-     * H.264 + faststart 트랜스코딩 (Chrome 호환, moov atom 앞으로 이동)
-     * 비동기로 호출되므로 응답 속도에 영향 없음
-     *
-     * @param inputPath 원본 파일 경로
-     * @return 트랜스코딩된 파일 경로 (실패 시 inputPath 반환)
+     * 트랜스코딩 + 썸네일 추출을 ffmpeg 한 번에 처리.
+     * 이미 H.264+AAC면 stream copy (수 초), 아니면 ultrafast 재인코딩.
      */
-    public String transcodeToH264(String inputPath) {
+    public ProcessedVideo processVideoFile(String inputPath) {
         String outputPath = inputPath.replaceAll("\\.[^.]+$", "") + "_h264.mp4";
 
-        String[] command = {
-            "ffmpeg",
-            "-i", inputPath,
-            "-c:v", "libx264",
-            "-c:a", "aac",
-            "-movflags", "+faststart",
-            "-y",
-            outputPath
-        };
+        File thumbDir = new File(storagePath, THUMBNAIL_DIR);
+        if (!thumbDir.exists()) thumbDir.mkdirs();
+        String thumbnailFilename = UUID.randomUUID() + ".jpg";
+        String thumbnailPath = new File(thumbDir, thumbnailFilename).getAbsolutePath();
+
+        VideoInfo info = probeVideo(inputPath);
+        log.info("ffprobe 결과: video={}, audio={}, duration={}s", info.videoCodec, info.audioCodec, info.durationSec);
+
+        boolean streamCopy = "h264".equals(info.videoCodec)
+                && ("aac".equals(info.audioCodec) || info.audioCodec.isEmpty());
+
+        // 트랜스코딩 + 썸네일을 ffmpeg 한 번에
+        String[] command = buildFfmpegCommand(inputPath, outputPath, thumbnailPath, streamCopy);
 
         try {
             ProcessBuilder pb = new ProcessBuilder(command);
@@ -113,21 +62,58 @@ public class VideoThumbnailUtil {
             int exitCode = process.waitFor();
             if (exitCode == 0 && new File(outputPath).exists()) {
                 new File(inputPath).delete();
-                log.info("트랜스코딩 완료: {} → {}", inputPath, outputPath);
-                return outputPath;
+                log.info("영상 처리 완료 ({}): {}", streamCopy ? "stream copy" : "재인코딩", outputPath);
+
+                String thumbnailUrl = new File(thumbnailPath).exists()
+                        ? "/thumbnails/" + thumbnailFilename : null;
+                return new ProcessedVideo(outputPath, thumbnailUrl, info.durationSec);
             } else {
-                log.error("트랜스코딩 실패: exitCode={}", exitCode);
-                return inputPath;
+                log.error("ffmpeg 실패: exitCode={}", exitCode);
+                return new ProcessedVideo(inputPath, null, info.durationSec);
             }
         } catch (Exception e) {
-            log.error("트랜스코딩 중 오류: {}", e.getMessage(), e);
-            return inputPath;
+            log.error("영상 처리 중 오류: {}", e.getMessage(), e);
+            return new ProcessedVideo(inputPath, null, info.durationSec);
         }
     }
 
-    /**
-     * 썸네일 파일 삭제
-     */
+    // 메모 생성 시 특정 시간 프레임 추출용
+    public String generateThumbnail(String videoFilePath, long timeMs) {
+        try {
+            File thumbDir = new File(storagePath, THUMBNAIL_DIR);
+            if (!thumbDir.exists()) thumbDir.mkdirs();
+
+            String thumbnailFilename = UUID.randomUUID() + ".jpg";
+            String thumbnailPath = new File(thumbDir, thumbnailFilename).getAbsolutePath();
+
+            long totalSeconds = timeMs / 1000;
+            String timeFormat = String.format("%02d:%02d:%02d", totalSeconds / 3600, (totalSeconds % 3600) / 60, totalSeconds % 60);
+
+            String[] command = {
+                "ffmpeg", "-y", "-i", videoFilePath,
+                "-ss", timeFormat, "-vframes", "1",
+                "-vf", "scale=320:240",
+                thumbnailPath
+            };
+
+            ProcessBuilder pb = new ProcessBuilder(command);
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            while (reader.readLine() != null) { /* drain */ }
+
+            int exitCode = process.waitFor();
+            if (exitCode == 0 && new File(thumbnailPath).exists()) {
+                return "/thumbnails/" + thumbnailFilename;
+            }
+            log.error("썸네일 생성 실패: exitCode={}", exitCode);
+            return null;
+        } catch (Exception e) {
+            log.error("썸네일 생성 중 오류: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+
     public void deleteThumbnail(String thumbnailUrl) {
         try {
             if (thumbnailUrl != null && thumbnailUrl.startsWith("/thumbnails/")) {
@@ -140,6 +126,76 @@ public class VideoThumbnailUtil {
             }
         } catch (Exception e) {
             log.error("썸네일 삭제 중 오류: {}", e.getMessage());
+        }
+    }
+
+    // ffprobe 한 번으로 코덱 + duration 동시 추출
+    private VideoInfo probeVideo(String inputPath) {
+        try {
+            Process probe = new ProcessBuilder(
+                "ffprobe", "-v", "error",
+                "-show_entries", "stream=codec_name,codec_type:format=duration",
+                "-of", "default=noprint_wrappers=1",
+                inputPath
+            ).start();
+
+            String videoCodec = "";
+            String audioCodec = "";
+            long durationSec = 0;
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(probe.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("codec_name=")) {
+                    // codec_type이 다음 줄에 오므로 codec_type 기준으로 분류
+                    String codec = line.substring("codec_name=".length()).trim();
+                    String nextLine = reader.readLine();
+                    if (nextLine != null && nextLine.startsWith("codec_type=")) {
+                        String type = nextLine.substring("codec_type=".length()).trim();
+                        if ("video".equals(type)) videoCodec = codec;
+                        else if ("audio".equals(type)) audioCodec = codec;
+                    }
+                } else if (line.startsWith("duration=")) {
+                    String val = line.substring("duration=".length()).trim();
+                    try {
+                        durationSec = (long) Double.parseDouble(val);
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+            probe.waitFor();
+            return new VideoInfo(videoCodec, audioCodec, durationSec);
+        } catch (Exception e) {
+            log.warn("ffprobe 실패, 재인코딩으로 fallback: {}", e.getMessage());
+            return new VideoInfo("", "", 0);
+        }
+    }
+
+    private String[] buildFfmpegCommand(String input, String output, String thumbnail, boolean streamCopy) {
+        // ffmpeg 한 번으로 트랜스코딩 + 썸네일 동시 추출
+        if (streamCopy) {
+            return new String[]{
+                "ffmpeg", "-y", "-i", input,
+                "-c", "copy", "-movflags", "+faststart", output,
+                "-vf", "select=eq(n\\,0),scale=320:240", "-frames:v", "1", thumbnail
+            };
+        } else {
+            return new String[]{
+                "ffmpeg", "-y", "-i", input,
+                "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-movflags", "+faststart", output,
+                "-vf", "select=eq(n\\,0),scale=320:240", "-frames:v", "1", thumbnail
+            };
+        }
+    }
+
+    private static class VideoInfo {
+        final String videoCodec;
+        final String audioCodec;
+        final long durationSec;
+
+        VideoInfo(String videoCodec, String audioCodec, long durationSec) {
+            this.videoCodec = videoCodec;
+            this.audioCodec = audioCodec;
+            this.durationSec = durationSec;
         }
     }
 }

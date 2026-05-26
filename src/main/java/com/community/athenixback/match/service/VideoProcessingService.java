@@ -27,22 +27,15 @@ public class VideoProcessingService {
         }
 
         try {
-            // H.264 트랜스코딩
-            String transcodedPath = videoThumbnailUtil.transcodeToH264(originalFilePath);
-            match.setVideoFilePath(transcodedPath);
+            // 트랜스코딩 + 썸네일 + duration 한 번에 처리
+            VideoThumbnailUtil.ProcessedVideo result = videoThumbnailUtil.processVideoFile(originalFilePath);
 
-            // 썸네일 생성
-            try {
-                String thumbnailUrl = videoThumbnailUtil.generateThumbnail(transcodedPath, 0);
-                match.setThumbnailUrl(thumbnailUrl);
-                log.info("썸네일 생성 완료: matchId={}", matchId);
-            } catch (Exception e) {
-                log.warn("썸네일 생성 실패 (무시): matchId={}, error={}", matchId, e.getMessage());
-            }
-
+            match.setVideoFilePath(result.videoPath);
+            match.setThumbnailUrl(result.thumbnailUrl);
+            match.setVideoDurationSec(result.durationSec);
             match.setStatus("임시 저장");
             matchRepository.save(match);
-            log.info("영상 처리 완료: matchId={}", matchId);
+            log.info("영상 처리 완료: matchId={}, duration={}s", matchId, result.durationSec);
 
         } catch (Exception e) {
             log.error("영상 처리 중 오류: matchId={}", matchId, e);

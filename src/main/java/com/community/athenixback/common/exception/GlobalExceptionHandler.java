@@ -58,6 +58,15 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.failure(ex.getCode(), ex.getMessage()));
     }
 
+    @ExceptionHandler(AIServerException.class)
+    public ResponseEntity<ApiResponse<?>> handleAIServerException(AIServerException ex) {
+        log.warn("AIServerException: {}", ex.getMessage());
+        HttpStatus status = HttpStatus.resolve(ex.getHttpStatus());
+        if (status == null) status = HttpStatus.INTERNAL_SERVER_ERROR;
+        return ResponseEntity.status(status)
+            .body(ApiResponse.failure(ex.getCode(), ex.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<?>> handleGenericException(Exception ex) {
         log.error("Unexpected exception: {}", ex.getMessage(), ex);

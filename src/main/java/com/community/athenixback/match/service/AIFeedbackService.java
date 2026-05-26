@@ -82,6 +82,9 @@ public class AIFeedbackService {
             // 5. 응답 객체 생성
             return toResponse(savedFeedback, aiResponse);
 
+        } catch (RuntimeException e) {
+            log.error("피드백 생성 실패", e);
+            throw e;
         } catch (Exception e) {
             log.error("피드백 생성 실패", e);
             throw new RuntimeException("피드백 생성 실패: " + e.getMessage(), e);
