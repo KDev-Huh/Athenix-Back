@@ -72,13 +72,15 @@ public class VideoController {
 
         } catch (IllegalArgumentException e) {
             log.warn("인증되지 않은 요청");
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "인증이 필요합니다.");
+            if (!response.isCommitted()) response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "인증이 필요합니다.");
         } catch (ResourceNotFoundException e) {
             log.warn("영상 조회 실패: {}", e.getMessage());
-            response.sendError(HttpServletResponse.SC_NOT_FOUND, e.getMessage());
+            if (!response.isCommitted()) response.sendError(HttpServletResponse.SC_NOT_FOUND, e.getMessage());
+        } catch (IOException e) {
+            log.debug("영상 스트리밍 클라이언트 연결 끊김: {}", e.getMessage());
         } catch (Exception e) {
             log.error("영상 스트리밍 오류", e);
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "영상 스트리밍 중 오류가 발생했습니다.");
+            if (!response.isCommitted()) response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "영상 스트리밍 중 오류가 발생했습니다.");
         }
     }
 
@@ -117,7 +119,7 @@ public class VideoController {
             }
         } catch (NumberFormatException e) {
             log.warn("Range 파싱 실패: {}", range);
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "잘못된 Range 헤더입니다.");
+            if (!response.isCommitted()) response.sendError(HttpServletResponse.SC_BAD_REQUEST, "잘못된 Range 헤더입니다.");
         }
     }
 
