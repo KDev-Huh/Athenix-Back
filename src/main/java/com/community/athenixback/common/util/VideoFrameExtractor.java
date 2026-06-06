@@ -1,6 +1,7 @@
 package com.community.athenixback.common.util;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -10,6 +11,9 @@ import java.io.InputStreamReader;
 @Slf4j
 @Component
 public class VideoFrameExtractor {
+
+    @Value("${app.ffmpeg.path:ffmpeg}")
+    private String ffmpegPath;
 
     /**
      * 동영상에서 특정 시간의 프레임을 JPG로 추출
@@ -37,7 +41,7 @@ public class VideoFrameExtractor {
                                    "frame_" + System.currentTimeMillis() + ".jpg";
 
             ProcessBuilder pb = new ProcessBuilder(
-                "ffmpeg",
+                ffmpegPath,
                 "-ss", timeString,
                 "-i", videoPath,
                 "-vframes", "1",

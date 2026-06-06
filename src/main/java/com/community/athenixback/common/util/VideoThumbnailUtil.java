@@ -16,6 +16,9 @@ public class VideoThumbnailUtil {
     @Value("${app.storage.path:/tmp/athenix-uploads}")
     private String storagePath;
 
+    @Value("${app.ffmpeg.path:ffmpeg}")
+    private String ffmpegPath;
+
     private static final String THUMBNAIL_DIR = "thumbnails";
 
     public static class ProcessedVideo {
@@ -90,7 +93,7 @@ public class VideoThumbnailUtil {
             String timeFormat = String.format("%02d:%02d:%02d", totalSeconds / 3600, (totalSeconds % 3600) / 60, totalSeconds % 60);
 
             String[] command = {
-                "ffmpeg", "-y", "-i", videoFilePath,
+                ffmpegPath, "-y", "-i", videoFilePath,
                 "-ss", timeFormat, "-vframes", "1",
                 "-vf", "scale=320:240",
                 thumbnailPath
@@ -131,9 +134,10 @@ public class VideoThumbnailUtil {
 
     // ffprobe 한 번으로 코덱 + duration 동시 추출
     private VideoInfo probeVideo(String inputPath) {
+        String ffprobePath = ffmpegPath.replace("ffmpeg", "ffprobe");
         try {
             Process probe = new ProcessBuilder(
-                "ffprobe", "-v", "error",
+                ffprobePath, "-v", "error",
                 "-show_entries", "stream=codec_name,codec_type:format=duration",
                 "-of", "default=noprint_wrappers=1",
                 inputPath
@@ -174,13 +178,13 @@ public class VideoThumbnailUtil {
         // ffmpeg 한 번으로 트랜스코딩 + 썸네일 동시 추출
         if (streamCopy) {
             return new String[]{
-                "ffmpeg", "-y", "-i", input,
+                ffmpegPath, "-y", "-i", input,
                 "-c", "copy", "-movflags", "+faststart", output,
                 "-vf", "select=eq(n\\,0),scale=320:240", "-frames:v", "1", thumbnail
             };
         } else {
             return new String[]{
-                "ffmpeg", "-y", "-i", input,
+                ffmpegPath, "-y", "-i", input,
                 "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-movflags", "+faststart", output,
                 "-vf", "select=eq(n\\,0),scale=320:240", "-frames:v", "1", thumbnail
             };
