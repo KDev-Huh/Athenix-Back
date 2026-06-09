@@ -24,6 +24,12 @@ public class PlayGuideDto {
 
     private String message;
 
+    @JsonProperty("frame_width")
+    private Double frameWidth;
+
+    @JsonProperty("frame_height")
+    private Double frameHeight;
+
     /**
      * 좌표 정보 (x, y)
      */

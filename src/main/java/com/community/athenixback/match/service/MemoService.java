@@ -164,12 +164,8 @@ public class MemoService {
             log.warn("playGuideJson 파싱 실패, situation으로 대체: feedbackId={}", feedback.getId());
         }
 
-        PlayGuideDto.CoordinateDto startCoord = playGuide != null
-            ? (playGuide.getStartPixel() != null ? playGuide.getStartPixel() : playGuide.getStart())
-            : null;
-        PlayGuideDto.CoordinateDto endCoord = playGuide != null
-            ? (playGuide.getEndPixel() != null ? playGuide.getEndPixel() : playGuide.getEnd())
-            : null;
+        PlayGuideDto.CoordinateDto startCoord = playGuide != null ? playGuide.getStartPixel() : null;
+        PlayGuideDto.CoordinateDto endCoord = playGuide != null ? playGuide.getEndPixel() : null;
 
         Memo memo = Memo.builder()
             .match(match)
