@@ -11,4 +11,8 @@ import lombok.NoArgsConstructor;
 @Builder
 public class MemoUpdateRequest {
     private String text;
+    private Double arrowStartX;
+    private Double arrowStartY;
+    private Double arrowEndX;
+    private Double arrowEndY;
 }

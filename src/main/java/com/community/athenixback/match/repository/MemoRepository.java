@@ -1,5 +1,6 @@
 package com.community.athenixback.match.repository;
 
+import com.community.athenixback.auth.entity.User;
 import com.community.athenixback.match.entity.Memo;
 import com.community.athenixback.match.entity.Match;
 import org.springframework.data.domain.Page;
@@ -13,6 +14,7 @@ import java.util.Optional;
 @Repository
 public interface MemoRepository extends JpaRepository<Memo, Long> {
     Page<Memo> findAll(Pageable pageable);
+    Page<Memo> findByMatchUser(User user, Pageable pageable);
     List<Memo> findByMatchOrderByCreatedAtDesc(Match match);
     List<Memo> findByMatchOrderByCreatedAtAsc(Match match);
     Optional<Memo> findByIdAndMatch(Long id, Match match);

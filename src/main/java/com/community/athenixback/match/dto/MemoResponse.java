@@ -20,6 +20,10 @@ public class MemoResponse {
     private String label;
     private String text;
     private String thumbnailUrl;
+    private Double arrowStartX;
+    private Double arrowStartY;
+    private Double arrowEndX;
+    private Double arrowEndY;
 
     @JsonProperty("createdAt")
     private LocalDateTime createdAt;

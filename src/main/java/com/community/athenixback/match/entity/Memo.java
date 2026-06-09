@@ -38,6 +38,18 @@ public class Memo {
     @Column(name = "thumbnail_url")
     private String thumbnailUrl;
 
+    @Column(name = "arrow_start_x")
+    private Double arrowStartX;
+
+    @Column(name = "arrow_start_y")
+    private Double arrowStartY;
+
+    @Column(name = "arrow_end_x")
+    private Double arrowEndX;
+
+    @Column(name = "arrow_end_y")
+    private Double arrowEndY;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

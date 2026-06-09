@@ -42,6 +42,7 @@ public class MemoController {
         @RequestParam(value = "sort", defaultValue = "latest") String sort) {
 
         log.info("전체 메모 조회: page={}, size={}", page, size);
+        User user = getCurrentUser();
 
         // page는 1부터 시작하므로 0 기반 인덱스로 변환
         int pageIndex = page - 1;
@@ -52,7 +53,7 @@ public class MemoController {
         Sort.Direction direction = "oldest".equalsIgnoreCase(sort) ? Sort.Direction.ASC : Sort.Direction.DESC;
         Pageable pageable = PageRequest.of(pageIndex, size, Sort.by(direction, "createdAt"));
 
-        Page<MemoResponse> memos = memoService.getAllMemos(pageable);
+        Page<MemoResponse> memos = memoService.getAllMemos(user, pageable);
 
         Map<String, Object> data = new HashMap<>();
         data.put("items", memos.getContent());

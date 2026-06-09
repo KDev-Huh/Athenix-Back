@@ -50,6 +50,10 @@ public class MemoService {
             .text(request.getText())
             .label(request.getLabel() != null ? request.getLabel() : "메모")
             .thumbnailUrl(thumbnailUrl)
+            .arrowStartX(request.getArrowStartX())
+            .arrowStartY(request.getArrowStartY())
+            .arrowEndX(request.getArrowEndX())
+            .arrowEndY(request.getArrowEndY())
             .build();
 
         memoRepository.save(memo);
@@ -57,8 +61,8 @@ public class MemoService {
     }
 
     @Transactional(readOnly = true)
-    public Page<MemoResponse> getAllMemos(Pageable pageable) {
-        Page<Memo> memos = memoRepository.findAll(pageable);
+    public Page<MemoResponse> getAllMemos(User user, Pageable pageable) {
+        Page<Memo> memos = memoRepository.findByMatchUser(user, pageable);
         return memos.map(this::mapToResponse);
     }
 
@@ -102,6 +106,10 @@ public class MemoService {
         }
 
         memo.setText(request.getText());
+        memo.setArrowStartX(request.getArrowStartX());
+        memo.setArrowStartY(request.getArrowStartY());
+        memo.setArrowEndX(request.getArrowEndX());
+        memo.setArrowEndY(request.getArrowEndY());
         memoRepository.save(memo);
         return mapToResponse(memo);
     }
@@ -146,20 +154,32 @@ public class MemoService {
      */
     @Transactional
     public MemoResponse addFeedbackAsMemo(Match match, AIFeedback feedback, String label) {
-        String memoText;
+        String memoText = feedback.getSituation();
+        PlayGuideDto playGuide = null;
+
         try {
-            PlayGuideDto playGuide = objectMapper.readValue(feedback.getPlayGuideJson(), PlayGuideDto.class);
+            playGuide = objectMapper.readValue(feedback.getPlayGuideJson(), PlayGuideDto.class);
             memoText = playGuide.getMessage() != null ? playGuide.getMessage() : feedback.getSituation();
         } catch (Exception e) {
             log.warn("playGuideJson 파싱 실패, situation으로 대체: feedbackId={}", feedback.getId());
-            memoText = feedback.getSituation();
         }
+
+        PlayGuideDto.CoordinateDto startCoord = playGuide != null
+            ? (playGuide.getStartPixel() != null ? playGuide.getStartPixel() : playGuide.getStart())
+            : null;
+        PlayGuideDto.CoordinateDto endCoord = playGuide != null
+            ? (playGuide.getEndPixel() != null ? playGuide.getEndPixel() : playGuide.getEnd())
+            : null;
 
         Memo memo = Memo.builder()
             .match(match)
             .timeMs(feedback.getTimeMs())
             .text(memoText)
             .label(label)
+            .arrowStartX(startCoord != null ? startCoord.getX() : null)
+            .arrowStartY(startCoord != null ? startCoord.getY() : null)
+            .arrowEndX(endCoord != null ? endCoord.getX() : null)
+            .arrowEndY(endCoord != null ? endCoord.getY() : null)
             .build();
 
         memoRepository.save(memo);
@@ -177,6 +197,10 @@ public class MemoService {
             .label(memo.getLabel())
             .text(memo.getText())
             .thumbnailUrl(memo.getThumbnailUrl())
+            .arrowStartX(memo.getArrowStartX())
+            .arrowStartY(memo.getArrowStartY())
+            .arrowEndX(memo.getArrowEndX())
+            .arrowEndY(memo.getArrowEndY())
             .createdAt(memo.getCreatedAt())
             .updatedAt(memo.getUpdatedAt())
             .build();
