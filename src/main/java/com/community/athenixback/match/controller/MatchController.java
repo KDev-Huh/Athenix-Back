@@ -99,7 +99,7 @@ public class MatchController {
     }
 
     @GetMapping("/{matchId}")
-    public ResponseEntity<ApiResponse<MatchResponse>> getMatch(@PathVariable Long matchId) {
+    public ResponseEntity<ApiResponse<MatchResponse>> getMatch(@PathVariable("matchId") Long matchId) {
         log.info("경기 단건 조회: matchId={}", matchId);
         User user = getCurrentUser();
         MatchResponse response = matchService.getMatchById(matchId, user);
@@ -108,7 +108,7 @@ public class MatchController {
 
     @PatchMapping("/{matchId}/status")
     public ResponseEntity<ApiResponse<MatchResponse>> updateMatchStatus(
-        @PathVariable Long matchId,
+        @PathVariable("matchId") Long matchId,
         @RequestBody StatusUpdateRequest request) {
 
         log.info("경기 상태 변경: matchId={}, status={}", matchId, request.getStatus());
@@ -118,7 +118,7 @@ public class MatchController {
     }
 
     @DeleteMapping("/{matchId}")
-    public ResponseEntity<ApiResponse<Map<String, String>>> deleteMatch(@PathVariable Long matchId) {
+    public ResponseEntity<ApiResponse<Map<String, String>>> deleteMatch(@PathVariable("matchId") Long matchId) {
         log.info("경기 삭제: matchId={}", matchId);
         User user = getCurrentUser();
         matchService.deleteMatch(matchId, user);
@@ -132,7 +132,7 @@ public class MatchController {
 
     @PostMapping("/{matchId}/memos")
     public ResponseEntity<ApiResponse<MemoResponse>> createMemo(
-        @PathVariable Long matchId,
+        @PathVariable("matchId") Long matchId,
         @RequestBody MemoCreateRequest request) {
 
         log.info("메모 생성: matchId={}", matchId);
@@ -143,7 +143,7 @@ public class MatchController {
 
     @GetMapping("/{matchId}/memos")
     public ResponseEntity<ApiResponse<Object>> getMemosByMatch(
-        @PathVariable Long matchId,
+        @PathVariable("matchId") Long matchId,
         @RequestParam(value = "sort", defaultValue = "latest") String sort) {
 
         log.info("경기별 메모 조회: matchId={}", matchId);

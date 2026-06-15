@@ -37,7 +37,7 @@ public class AIFeedbackController {
      */
     @PostMapping
     public ResponseEntity<ApiResponse<AIFeedbackResponse>> createFeedback(
-        @PathVariable Long matchId,
+        @PathVariable("matchId") Long matchId,
         @RequestBody AIFeedbackRequest request) {
 
         log.info("AI 피드백 생성 요청: matchId={}, timeMs={}, isRtl={}", matchId, request.getTimeMs(), request.getIsRtl());
@@ -58,7 +58,7 @@ public class AIFeedbackController {
      */
     @GetMapping
     public ResponseEntity<ApiResponse<Object>> getFeedbacksByMatch(
-        @PathVariable Long matchId,
+        @PathVariable("matchId") Long matchId,
         @RequestParam(value = "page", defaultValue = "1") int page,
         @RequestParam(value = "size", defaultValue = "20") int size,
         @RequestParam(value = "sort", defaultValue = "latest") String sort) {
@@ -90,7 +90,7 @@ public class AIFeedbackController {
      */
     @PostMapping("/memo")
     public ResponseEntity<ApiResponse<MemoResponse>> addFeedbackAsMemo(
-        @PathVariable Long matchId,
+        @PathVariable("matchId") Long matchId,
         @RequestBody Map<String, Object> request) {
 
         Long feedbackId = ((Number) request.get("feedbackId")).longValue();

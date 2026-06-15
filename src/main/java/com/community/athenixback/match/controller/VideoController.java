@@ -37,7 +37,7 @@ public class VideoController {
 
     @GetMapping
     public void streamVideo(
-            @PathVariable Long matchId,
+            @PathVariable("matchId") Long matchId,
             @RequestHeader(value = "Range", required = false) String range,
             HttpServletResponse response) throws IOException {
 
@@ -138,7 +138,7 @@ public class VideoController {
     }
 
     @GetMapping("/meta")
-    public ResponseEntity<ApiResponse<VideoMetaResponse>> getVideoMeta(@PathVariable Long matchId) {
+    public ResponseEntity<ApiResponse<VideoMetaResponse>> getVideoMeta(@PathVariable("matchId") Long matchId) {
         log.info("영상 메타 조회: matchId={}", matchId);
 
         try {

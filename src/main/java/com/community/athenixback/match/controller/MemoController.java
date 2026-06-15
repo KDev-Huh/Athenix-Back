@@ -80,7 +80,7 @@ public class MemoController {
 
     @PatchMapping("/{memoId}")
     public ResponseEntity<ApiResponse<MemoResponse>> updateMemo(
-        @PathVariable Long memoId,
+        @PathVariable("memoId") Long memoId,
         @RequestBody MemoUpdateRequest request) {
 
         log.info("메모 수정: memoId={}", memoId);
@@ -90,7 +90,7 @@ public class MemoController {
     }
 
     @DeleteMapping("/{memoId}")
-    public ResponseEntity<ApiResponse<Map<String, String>>> deleteMemo(@PathVariable Long memoId) {
+    public ResponseEntity<ApiResponse<Map<String, String>>> deleteMemo(@PathVariable("memoId") Long memoId) {
         log.info("메모 삭제: memoId={}", memoId);
         User user = getCurrentUser();
         memoService.deleteMemo(memoId, user);

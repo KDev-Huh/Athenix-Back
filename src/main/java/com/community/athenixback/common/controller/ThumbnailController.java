@@ -30,7 +30,7 @@ public class ThumbnailController {
      * GET /api/v1/thumbnails/{filename}
      */
     @GetMapping("/{filename}")
-    public ResponseEntity<byte[]> getThumbnail(@PathVariable String filename) {
+    public ResponseEntity<byte[]> getThumbnail(@PathVariable("filename") String filename) {
         try {
             // 파일 경로 생성
             File thumbnailFile = new File(storagePath, "thumbnails/" + filename);

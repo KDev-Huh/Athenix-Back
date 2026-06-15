@@ -17,7 +17,7 @@ public class FileStorageUtil {
     @Value("${app.storage.path:/tmp/athenix-uploads}")
     private String storagePath;
 
-    @Value("${app.storage.max-file-size:5242880}")
+    @Value("${app.storage.max-file-size}")
     private long maxFileSize;
 
     private static final String[] ALLOWED_VIDEO_TYPES = {"video/mp4", "video/mpeg", "video/quicktime", "video/x-msvideo"};
