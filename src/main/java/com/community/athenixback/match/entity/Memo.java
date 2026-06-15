@@ -50,6 +50,10 @@ public class Memo {
     @Column(name = "arrow_end_y")
     private Double arrowEndY;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "arrow_style", length = 10)
+    private ArrowStyle arrowStyle;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

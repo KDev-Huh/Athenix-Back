@@ -1,5 +1,6 @@
 package com.community.athenixback.match.dto;
 
+import com.community.athenixback.match.entity.ArrowStyle;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,4 +18,5 @@ public class MemoCreateRequest {
     private Double arrowStartY;
     private Double arrowEndX;
     private Double arrowEndY;
+    private ArrowStyle arrowStyle;
 }

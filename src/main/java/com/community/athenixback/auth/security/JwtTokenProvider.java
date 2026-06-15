@@ -25,14 +25,14 @@ public class JwtTokenProvider {
     private long refreshTokenExpiration;
 
     public String generateAccessToken(User user) {
-        return generateToken(user.getEmail(), tokenExpiration);
+        return generateToken(user, tokenExpiration);
     }
 
     public String generateRefreshToken(User user) {
-        return generateToken(user.getEmail(), refreshTokenExpiration);
+        return generateToken(user, refreshTokenExpiration);
     }
 
-    private String generateToken(String email, long expiration) {
+    private String generateToken(User user, long expiration) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
@@ -41,7 +41,8 @@ public class JwtTokenProvider {
         SecretKeySpec key = new SecretKeySpec(keyBytes, 0, keyBytes.length, signatureAlgorithm.getJcaName());
 
         return Jwts.builder()
-            .setSubject(email)
+            .setSubject(user.getEmail())
+            .claim("userId", user.getId())
             .setIssuedAt(now)
             .setExpiration(expiryDate)
             .signWith(key, signatureAlgorithm)
@@ -51,6 +52,21 @@ public class JwtTokenProvider {
     public String getEmailFromToken(String token) {
         Claims claims = getAllClaimsFromToken(token);
         return claims.getSubject();
+    }
+
+    public Long getUserIdFromToken(String token) {
+        Claims claims = getAllClaimsFromToken(token);
+        Object userId = claims.get("userId");
+
+        if (userId instanceof Number number) {
+            return number.longValue();
+        }
+
+        if (userId instanceof String value) {
+            return Long.parseLong(value);
+        }
+
+        return null;
     }
 
     public boolean validateToken(String token) {
@@ -84,4 +100,3 @@ public class JwtTokenProvider {
         return tokenExpiration;
     }
 }
-

@@ -7,6 +7,7 @@ import com.community.athenixback.match.dto.AIFeedbackResponse;
 import com.community.athenixback.match.dto.AIServerResponse;
 import com.community.athenixback.match.dto.PlayGuideDto;
 import com.community.athenixback.match.entity.AIFeedback;
+import com.community.athenixback.match.entity.ArrowStyle;
 import com.community.athenixback.match.entity.Match;
 import com.community.athenixback.match.repository.AIFeedbackRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -65,8 +66,12 @@ public class AIFeedbackService {
                 situation = "분석 결과를 획득할 수 없습니다.";
             }
 
-            // 3. playGuideJson으로 저장하기 위해 JSON 문자열로 변환
-            String playGuideJson = objectMapper.writeValueAsString(aiResponse.getPlayGuide());
+            // 3. playGuide type으로 arrowStyle 결정 후 JSON 직렬화
+            PlayGuideDto playGuide = aiResponse.getPlayGuide();
+            if (playGuide != null) {
+                playGuide.setArrowStyle(ArrowStyle.fromPlayType(playGuide.getType()));
+            }
+            String playGuideJson = objectMapper.writeValueAsString(playGuide);
 
             // 4. AI 피드백 엔티티 생성 및 저장
             AIFeedback feedback = AIFeedback.builder()

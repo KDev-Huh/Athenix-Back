@@ -1,5 +1,6 @@
 package com.community.athenixback.match.dto;
 
+import com.community.athenixback.match.entity.ArrowStyle;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,6 +25,7 @@ public class MemoResponse {
     private Double arrowStartY;
     private Double arrowEndX;
     private Double arrowEndY;
+    private ArrowStyle arrowStyle;
 
     @JsonProperty("createdAt")
     private LocalDateTime createdAt;

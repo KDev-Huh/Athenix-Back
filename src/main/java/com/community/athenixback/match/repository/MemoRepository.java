@@ -15,6 +15,8 @@ import java.util.Optional;
 public interface MemoRepository extends JpaRepository<Memo, Long> {
     Page<Memo> findAll(Pageable pageable);
     Page<Memo> findByMatchUser(User user, Pageable pageable);
+    long countByMatchUser(User user);
+    long countByMatchUserAndLabel(User user, String label);
     List<Memo> findByMatchOrderByCreatedAtDesc(Match match);
     List<Memo> findByMatchOrderByCreatedAtAsc(Match match);
     Optional<Memo> findByIdAndMatch(Long id, Match match);

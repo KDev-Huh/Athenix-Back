@@ -1,5 +1,6 @@
 package com.community.athenixback.match.dto;
 
+import com.community.athenixback.match.entity.ArrowStyle;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,6 +13,9 @@ import lombok.NoArgsConstructor;
 @Builder
 public class PlayGuideDto {
     private String type;
+
+    @JsonProperty("arrow_style")
+    private ArrowStyle arrowStyle;
 
     private CoordinateDto start;
     private CoordinateDto end;

@@ -54,6 +54,7 @@ public class MemoService {
             .arrowStartY(request.getArrowStartY())
             .arrowEndX(request.getArrowEndX())
             .arrowEndY(request.getArrowEndY())
+            .arrowStyle(request.getArrowStyle())
             .build();
 
         memoRepository.save(memo);
@@ -110,6 +111,7 @@ public class MemoService {
         memo.setArrowStartY(request.getArrowStartY());
         memo.setArrowEndX(request.getArrowEndX());
         memo.setArrowEndY(request.getArrowEndY());
+        memo.setArrowStyle(request.getArrowStyle());
         memoRepository.save(memo);
         return mapToResponse(memo);
     }
@@ -176,6 +178,7 @@ public class MemoService {
             .arrowStartY(startCoord != null ? startCoord.getY() : null)
             .arrowEndX(endCoord != null ? endCoord.getX() : null)
             .arrowEndY(endCoord != null ? endCoord.getY() : null)
+            .arrowStyle(playGuide != null ? playGuide.getArrowStyle() : null)
             .build();
 
         memoRepository.save(memo);
@@ -197,6 +200,7 @@ public class MemoService {
             .arrowStartY(memo.getArrowStartY())
             .arrowEndX(memo.getArrowEndX())
             .arrowEndY(memo.getArrowEndY())
+            .arrowStyle(memo.getArrowStyle())
             .createdAt(memo.getCreatedAt())
             .updatedAt(memo.getUpdatedAt())
             .build();
